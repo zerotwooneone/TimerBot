@@ -57,15 +57,15 @@ bot.on('message', function (user, userID, channelID, message, evt) {
                     });
                     break;
                 }
-
-                bot.sendMessage({
-                    to: channelID,
-                    message: 'Starting Timer for ' + seconds + ' seconds.'
-                });
-                addTimer(channelID, seconds);
+                let timerId = addTimer(channelID, seconds);
+                if(timerId){
+                    bot.sendMessage({
+                        to: channelID,
+                        message: `Starting Timer for ${seconds} seconds. Id : ${timerId}`
+                    });
+                }
 
                 break;
-            // Just add any case commands if you want to..
         }
     }
 });
@@ -73,19 +73,19 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 function onTimer(arg) {
     bot.sendMessage({
         to: arg.channelID,
-        message: 'Timer Elapsed'
+        message: `Timer Elapsed. Id : ${arg.id}`
     });
     removeTimer(arg.channelID, arg.id);
 }
 
 function addTimer(channelID, seconds) {
     if (hashCount > 1000) {
-        return -1;
+        return null;
     }
     let hashKey = getHashKey(channelID, hashCount);
     timerHash[hashKey] = {};
-    let myId = hashCount;
-    hashCount++;
+    hashCount++; //increment before we get id, because we dont want an id of zero (falsey)
+    let myId = pad(hashCount, 4); 
     let timeMilliseconds = seconds * 1000;
     setTimeout(onTimer, timeMilliseconds, { channelID: channelID, id: myId });
     return myId;
@@ -98,6 +98,12 @@ function removeTimer(channelID, id) {
 }
 
 function getHashKey(channelID, id) {
-    let hashKey = `channel${channelID}-${id}`;
+    let hashKey = `channel:${channelID}-id:${id}`;
     return hashKey;
+}
+
+function pad(input, width, padCharacter) {
+    padCharacter = padCharacter || '0';
+    input = input + '';
+    return input.length >= width ? input : new Array(width - input.length + 1).join(padCharacter) + input;
 }
