@@ -9,8 +9,8 @@ logger.add(new logger.transports.Console, {
 logger.level = 'debug';
 // Initialize Discord Bot
 var bot = new Discord.Client({
-   token: auth.token,
-   autorun: true
+    token: auth.token,
+    autorun: true
 });
 bot.on('ready', function (evt) {
     logger.info('Connected');
@@ -23,17 +23,55 @@ bot.on('message', function (user, userID, channelID, message, evt) {
     if (message.substring(0, 1) == '!') {
         var args = message.substring(1).split(' ');
         var cmd = args[0];
-       
+
         args = args.splice(1);
-        switch(cmd) {
+        switch (cmd) {
             // !ping
             case 'ping':
                 bot.sendMessage({
                     to: channelID,
                     message: 'Pong!'
                 });
-            break;
+            case 'timer':
+                let seconds = parseInt(args[0]);
+                if (Number.isNaN(seconds)) {
+                    bot.sendMessage({
+                        to: channelID,
+                        message: 'you must provide a number of seconds'
+                    });
+                    break;
+                }
+                if (seconds < 1) {
+                    bot.sendMessage({
+                        to: channelID,
+                        message: 'the number of seconds must be > 0'
+                    });
+                    break;
+                }
+                if (seconds > 65,535) {
+                    bot.sendMessage({
+                        to: channelID,
+                        message: 'the number of seconds is too large'
+                    });
+                    break;
+                }
+
+                bot.sendMessage({
+                    to: channelID,
+                    message: 'Starting Timer for ' + seconds + ' seconds.'
+                });
+                let timeMilliseconds = seconds * 1000;
+                setTimeout(onTimer, timeMilliseconds, channelID);
+
+                break;
             // Just add any case commands if you want to..
-         }
-     }
+        }
+    }
 });
+
+function onTimer(channelID) {
+    bot.sendMessage({
+        to: channelID,
+        message: 'Timer Elapsed'
+    });
+}
