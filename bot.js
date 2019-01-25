@@ -57,11 +57,11 @@ bot.on('message', function (user, userID, channelID, message, evt) {
                     });
                     break;
                 }
-                let timerId = addTimer(channelID, seconds);
+                let timerId = addTimer(channelID, seconds, userID);
                 if(timerId){
                     bot.sendMessage({
                         to: channelID,
-                        message: `Starting Timer for ${seconds} seconds. Id : ${timerId}`
+                        message: `<@${userID}> Starting Timer for ${seconds} seconds. Id : ${timerId}`
                     });
                 }
 
@@ -73,12 +73,12 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 function onTimer(arg) {
     bot.sendMessage({
         to: arg.channelID,
-        message: `Timer Elapsed. Id : ${arg.id}`
+        message: `<@${arg.userID}> Timer Elapsed. Id : ${arg.id}`
     });
     removeTimer(arg.channelID, arg.id);
 }
 
-function addTimer(channelID, seconds) {
+function addTimer(channelID, seconds, userID) {
     if (hashCount > 1000) {
         return null;
     }
@@ -87,7 +87,7 @@ function addTimer(channelID, seconds) {
     hashCount++; //increment before we get id, because we dont want an id of zero (falsey)
     let myId = pad(hashCount, 4); 
     let timeMilliseconds = seconds * 1000;
-    setTimeout(onTimer, timeMilliseconds, { channelID: channelID, id: myId });
+    setTimeout(onTimer, timeMilliseconds, { channelID: channelID, id: myId, userID: userID });
     return myId;
 }
 
