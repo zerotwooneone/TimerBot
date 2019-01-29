@@ -2,7 +2,7 @@ var Discord = require('discord.io');
 var logger = require('winston');
 var auth = require('./auth.json');
 // Configure logger settings
-var timerHash = {};
+var timerHash:any = {};
 var hashCount = 0;
 logger.remove(logger.transports.Console);
 logger.add(new logger.transports.Console, {
@@ -14,7 +14,7 @@ var bot = new Discord.Client({
     token: auth.token,
     autorun: true
 });
-bot.on('ready', function (evt) {
+bot.on('ready', function (evt:any) {
     logger.info('Connected');
     logger.info('Logged in as: ');
     logger.info(bot.username + ' - (' + bot.id + ')');
@@ -26,7 +26,7 @@ var commandHandler = {
     "--name": { handleValue: HandleValue("timerName"), valueStrategy: NextArgWithQuotes, coerceValue: CoerceString() },
 }
 function CoerceInt() {
-    return (stringValue) => {
+    return (stringValue:string) => {
         let intValue = parseInt(stringValue);
         if (Number.isNaN(intValue)) {
             return;
@@ -35,14 +35,14 @@ function CoerceInt() {
     }
 }
 function CoerceString() {
-    return (stringValue) => {
+    return (stringValue:string) => {
         return stringValue;
     }
 }
-function NextArg(state) {
+function NextArg(state:any) {
     return state.getNextValue();
 }
-function NextArgWithQuotes(state) {
+function NextArgWithQuotes(state:any) {
     let value = state.getNextValue();
     if (value && value.startsWith('"')) {
         let result = value.substring(1);
@@ -64,10 +64,10 @@ function NextArgWithQuotes(state) {
         return value;
     }
 }
-function HandleValue(stateKey) {
-    return (value, state) => state[stateKey] = value;
+function HandleValue(stateKey:any) {
+    return (value:any, state:any) => state[stateKey] = value;
 }
-function Parse(commands, args) {
+function Parse(commands:any, args:string[]) {
     let state = {};
     for (const handlerKey in commands) {
         let argIndex = args.indexOf(handlerKey);
@@ -87,7 +87,7 @@ function Parse(commands, args) {
     }
     return state;
 }
-bot.on('message', function (user, userID, channelID, message, evt) {
+bot.on('message', function (user:string, userID:string, channelID:string, message:string, evt:any) {
     // Our bot needs to know if it will execute a command
     // It will listen for messages that will start with `!`
     if (message.substring(0, 1) == '!') {
@@ -97,7 +97,7 @@ bot.on('message', function (user, userID, channelID, message, evt) {
         args = args.splice(1);
         switch (cmd) {
             case 'timer':
-                let parsed = Parse(commandHandler, args);
+                let parsed:any = Parse(commandHandler, args);
                 if (parsed.newTimerSeconds === undefined ||
                     parsed.newTimerSeconds === null ||
                     Number.isNaN(parsed.newTimerSeconds)) {
@@ -154,36 +154,36 @@ bot.on('message', function (user, userID, channelID, message, evt) {
     }
 });
 
-function onTimer(arg) {
+function onTimer(arg:any) {
     if (arg.onComplete && typeof arg.onComplete === 'function') {
         arg.onComplete();
     }
     removeTimer(arg.hashKey);
 }
 
-function addTimer(seconds, hashKey, func, param) {
+function addTimer(seconds:number, hashKey:string, func:(x:any)=>void, param:any) {
     if (hashCount > 1000) {
         return null;
     }
     hashCount++; //increment before we get id, because we dont want an id of zero (falsey)
-    let myId = pad(hashCount, 4);
+    let myId = pad(hashCount, 4, '0');
     timerHash[hashKey] = { id: myId };
     let timeMilliseconds = seconds * 1000;
     setTimeout(func, timeMilliseconds, param);
     return myId;
 }
 
-function removeTimer(hashKey) {
+function removeTimer(hashKey:string) {
     delete timerHash[hashKey];
     hashCount--;
 }
 
-function getHashKey(channelID, id) {
+function getHashKey(channelID:string, id:any) {
     let hashKey = `channel:${channelID}-id:${id}`;
     return hashKey;
 }
 
-function pad(input, width, padCharacter) {
+function pad(input:any, width:any, padCharacter:any) {
     padCharacter = padCharacter || '0';
     input = input + '';
     return input.length >= width ? input : new Array(width - input.length + 1).join(padCharacter) + input;
