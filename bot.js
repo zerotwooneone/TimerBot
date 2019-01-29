@@ -19,6 +19,45 @@ bot.on('ready', function (evt) {
     logger.info('Logged in as: ');
     logger.info(bot.username + ' - (' + bot.id + ')');
 });
+var commandHandler = {
+    "-s": { handleValue: HandleValue("newTimerSeconds"), valueStrategy: NextArg, coerceValue: CoerceInt()},
+    "--seconds": { handleValue: HandleValue("newTimerSeconds"), valueStrategy: NextArg, coerceValue: CoerceInt()}
+}
+function CoerceInt(){
+    return (stringValue)=>{
+        let intValue = parseInt(stringValue);
+        if(Number.isNaN(intValue)){
+            return;
+        }
+        return intValue;
+    }
+}
+function NextArg(state){
+    return state.getNextValue();
+}
+function HandleValue(stateKey){
+    return (value, state)=>state[stateKey] = value;
+}
+function Parse(commands, args){
+    let state = {};
+    for (const handlerKey in commands) {
+        let argIndex = args.indexOf(handlerKey);
+        if(argIndex != -1){
+            let argState = {getNextValue: ()=>args[argIndex+1]};
+            let arg = args[argIndex];
+            let handler = commands[handlerKey];
+            let value;
+            if(handler.valueStrategy){
+                value = handler.valueStrategy(argState);
+            }
+            if(handler.coerceValue){
+                value = handler.coerceValue(value);
+            }
+            handler.handleValue(value, state);
+        }
+    }
+    return state;
+}
 bot.on('message', function (user, userID, channelID, message, evt) {
     // Our bot needs to know if it will execute a command
     // It will listen for messages that will start with `!`
@@ -28,40 +67,36 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 
         args = args.splice(1);
         switch (cmd) {
-            // !ping
-            case 'ping':
-                bot.sendMessage({
-                    to: channelID,
-                    message: 'Pong!'
-                });
             case 'timer':
-                let seconds = parseInt(args[0]);
-                if (Number.isNaN(seconds)) {
+                let parsed = Parse(commandHandler, args);
+                if (parsed.newTimerSeconds === undefined ||
+                    parsed.newTimerSeconds === null ||
+                    Number.isNaN(parsed.newTimerSeconds)) {
                     bot.sendMessage({
                         to: channelID,
-                        message: 'you must provide a number of seconds'
+                        message: `<@${userID}> you must provide a number of seconds. !timer --seconds 5`
                     });
                     break;
                 }
-                if (seconds < 1) {
+                if (parsed.newTimerSeconds < 1) {
                     bot.sendMessage({
                         to: channelID,
-                        message: 'the number of seconds must be > 0'
+                        message: `<@${userID}> the number of seconds must be > 0`
                     });
                     break;
                 }
-                if (seconds > 65535) {
+                if (parsed.newTimerSeconds > 65535) {
                     bot.sendMessage({
                         to: channelID,
-                        message: 'the number of seconds is too large'
+                        message: `<@${userID}> the number of seconds is too large`
                     });
                     break;
                 }
-                let timerId = addTimer(channelID, seconds, userID);
-                if(timerId){
+                let timerId = addTimer(channelID, parsed.newTimerSeconds, userID);
+                if (timerId) {
                     bot.sendMessage({
                         to: channelID,
-                        message: `<@${userID}> Starting Timer for ${seconds} seconds. Id : ${timerId}`
+                        message: `<@${userID}> Starting Timer for ${parsed.newTimerSeconds} seconds. Id : ${timerId}`
                     });
                 }
 
@@ -85,7 +120,7 @@ function addTimer(channelID, seconds, userID) {
     let hashKey = getHashKey(channelID, hashCount);
     timerHash[hashKey] = {};
     hashCount++; //increment before we get id, because we dont want an id of zero (falsey)
-    let myId = pad(hashCount, 4); 
+    let myId = pad(hashCount, 4);
     let timeMilliseconds = seconds * 1000;
     setTimeout(onTimer, timeMilliseconds, { channelID: channelID, id: myId, userID: userID });
     return myId;
