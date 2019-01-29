@@ -1,20 +1,18 @@
-var Discord = require('discord.io');
-var logger = require('winston');
-var auth = require('./auth.json');
+import Discord = require('discord.io');
+import logger = require('winston');
+import * as auth from './auth.json';
 // Configure logger settings
-var timerHash:any = {};
-var hashCount = 0;
+var timerHash: { [index: string]: { id: string } } = {};
+var hashCount: number = 0;
 logger.remove(logger.transports.Console);
-logger.add(new logger.transports.Console, {
-    colorize: true
-});
+logger.add(new logger.transports.Console);
 logger.level = 'debug';
 // Initialize Discord Bot
 var bot = new Discord.Client({
     token: auth.token,
     autorun: true
 });
-bot.on('ready', function (evt:any) {
+bot.on('ready', function (evt: any) {
     logger.info('Connected');
     logger.info('Logged in as: ');
     logger.info(bot.username + ' - (' + bot.id + ')');
@@ -25,24 +23,24 @@ var commandHandler = {
     "-n": { handleValue: HandleValue("timerName"), valueStrategy: NextArgWithQuotes, coerceValue: CoerceString() },
     "--name": { handleValue: HandleValue("timerName"), valueStrategy: NextArgWithQuotes, coerceValue: CoerceString() },
 }
-function CoerceInt() {
-    return (stringValue:string) => {
+function CoerceInt(): (s: string) => number | null {
+    return (stringValue: string) => {
         let intValue = parseInt(stringValue);
         if (Number.isNaN(intValue)) {
-            return;
+            return null;
         }
         return intValue;
     }
 }
-function CoerceString() {
-    return (stringValue:string) => {
+function CoerceString(): (s: string) => string {
+    return (stringValue: string) => {
         return stringValue;
     }
 }
-function NextArg(state:any) {
+function NextArg(state: any): string {
     return state.getNextValue();
 }
-function NextArgWithQuotes(state:any) {
+function NextArgWithQuotes(state: any): string {
     let value = state.getNextValue();
     if (value && value.startsWith('"')) {
         let result = value.substring(1);
@@ -59,15 +57,15 @@ function NextArgWithQuotes(state:any) {
                 result = result + " " + value;
             }
         }
-
+        return value;
     } else {
         return value;
     }
 }
-function HandleValue(stateKey:any) {
-    return (value:any, state:any) => state[stateKey] = value;
+function HandleValue(stateKey: any): (value: any, state: any) => void {
+    return (value: any, state: any) => state[stateKey] = value;
 }
-function Parse(commands:any, args:string[]) {
+function Parse(commands: any, args: string[]): {} {
     let state = {};
     for (const handlerKey in commands) {
         let argIndex = args.indexOf(handlerKey);
@@ -87,7 +85,7 @@ function Parse(commands:any, args:string[]) {
     }
     return state;
 }
-bot.on('message', function (user:string, userID:string, channelID:string, message:string, evt:any) {
+bot.on('message', function (user: string, userID: string, channelID: string, message: string, evt: any) {
     // Our bot needs to know if it will execute a command
     // It will listen for messages that will start with `!`
     if (message.substring(0, 1) == '!') {
@@ -97,7 +95,7 @@ bot.on('message', function (user:string, userID:string, channelID:string, messag
         args = args.splice(1);
         switch (cmd) {
             case 'timer':
-                let parsed:any = Parse(commandHandler, args);
+                let parsed: any = Parse(commandHandler, args);
                 if (parsed.newTimerSeconds === undefined ||
                     parsed.newTimerSeconds === null ||
                     Number.isNaN(parsed.newTimerSeconds)) {
@@ -154,14 +152,14 @@ bot.on('message', function (user:string, userID:string, channelID:string, messag
     }
 });
 
-function onTimer(arg:any) {
+function onTimer(arg: any) {
     if (arg.onComplete && typeof arg.onComplete === 'function') {
         arg.onComplete();
     }
     removeTimer(arg.hashKey);
 }
 
-function addTimer(seconds:number, hashKey:string, func:(x:any)=>void, param:any) {
+function addTimer(seconds: number, hashKey: string, func: (x: any) => void, param: any): string | null {
     if (hashCount > 1000) {
         return null;
     }
@@ -173,17 +171,17 @@ function addTimer(seconds:number, hashKey:string, func:(x:any)=>void, param:any)
     return myId;
 }
 
-function removeTimer(hashKey:string) {
+function removeTimer(hashKey: string): void {
     delete timerHash[hashKey];
     hashCount--;
 }
 
-function getHashKey(channelID:string, id:any) {
+function getHashKey(channelID: string, id: any): string {
     let hashKey = `channel:${channelID}-id:${id}`;
     return hashKey;
 }
 
-function pad(input:any, width:any, padCharacter:any) {
+function pad(input: any, width: any, padCharacter: any): string {
     padCharacter = padCharacter || '0';
     input = input + '';
     return input.length >= width ? input : new Array(width - input.length + 1).join(padCharacter) + input;
