@@ -103,7 +103,20 @@ bot.on('message', function (user, userID, channelID, message, evt) {
                     const maxTimeNameLength = 64;
                     parsed.timerName = parsed.timerName.substring(0, maxTimeNameLength);
                 }
-                let timerId = addTimer(channelID, parsed.newTimerSeconds, userID, parsed.timerName);
+                let hashKey = getHashKey(channelID, hashCount);
+                let timerParam = {
+                    onComplete: () => {
+                        let namePart = parsed.timerName ?
+                            `Name: ${parsed.timerName}` :
+                            `Id : ${timerHash[hashKey].id}`;
+                        bot.sendMessage({
+                            to: channelID,
+                            message: `<@${userID}> Timer Elapsed. ${namePart}`
+                        });
+                    },
+                    hashKey: hashKey
+                };
+                let timerId = addTimer(parsed.newTimerSeconds, hashKey, onTimer, timerParam)
                 if (timerId) {
                     let namePart = parsed.timerName ?
                         `Name: ${parsed.timerName}` :
@@ -120,31 +133,25 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 });
 
 function onTimer(arg) {
-    let namePart = arg.timerName ?
-        `Name: ${arg.timerName}` :
-        `Id : ${arg.id}`;
-    bot.sendMessage({
-        to: arg.channelID,
-        message: `<@${arg.userID}> Timer Elapsed. ${namePart}`
-    });
-    removeTimer(arg.channelID, arg.id);
+    if(arg.onComplete && typeof arg.onComplete === 'function'){
+        arg.onComplete();
+    }
+    removeTimer(arg.hashKey);
 }
 
-function addTimer(channelID, seconds, userID, timerName) {
+function addTimer(seconds, hashKey, func, param) {
     if (hashCount > 1000) {
         return null;
     }
-    let hashKey = getHashKey(channelID, hashCount);
-    timerHash[hashKey] = {};
     hashCount++; //increment before we get id, because we dont want an id of zero (falsey)
     let myId = pad(hashCount, 4);
+    timerHash[hashKey] = { id: myId };
     let timeMilliseconds = seconds * 1000;
-    setTimeout(onTimer, timeMilliseconds, { channelID: channelID, id: myId, userID: userID, timerName: timerName });
+    setTimeout(func, timeMilliseconds, param);
     return myId;
 }
 
-function removeTimer(channelID, id) {
-    let hashKey = getHashKey(channelID, id);
+function removeTimer(hashKey) {
     delete timerHash[hashKey];
     hashCount--;
 }
