@@ -20,37 +20,44 @@ bot.on('ready', function (evt) {
     logger.info(bot.username + ' - (' + bot.id + ')');
 });
 var commandHandler = {
-    "-s": { handleValue: HandleValue("newTimerSeconds"), valueStrategy: NextArg, coerceValue: CoerceInt()},
-    "--seconds": { handleValue: HandleValue("newTimerSeconds"), valueStrategy: NextArg, coerceValue: CoerceInt()}
+    "-s": { handleValue: HandleValue("newTimerSeconds"), valueStrategy: NextArg, coerceValue: CoerceInt() },
+    "--seconds": { handleValue: HandleValue("newTimerSeconds"), valueStrategy: NextArg, coerceValue: CoerceInt() },
+    "-n": { handleValue: HandleValue("timerName"), valueStrategy: NextArg, coerceValue: CoerceString() },
+    "--name": { handleValue: HandleValue("timerName"), valueStrategy: NextArg, coerceValue: CoerceString() },
 }
-function CoerceInt(){
-    return (stringValue)=>{
+function CoerceInt() {
+    return (stringValue) => {
         let intValue = parseInt(stringValue);
-        if(Number.isNaN(intValue)){
+        if (Number.isNaN(intValue)) {
             return;
         }
         return intValue;
     }
 }
-function NextArg(state){
+function CoerceString() {
+    return (stringValue) => {
+        return stringValue;
+    }
+}
+function NextArg(state) {
     return state.getNextValue();
 }
-function HandleValue(stateKey){
-    return (value, state)=>state[stateKey] = value;
+function HandleValue(stateKey) {
+    return (value, state) => state[stateKey] = value;
 }
-function Parse(commands, args){
+function Parse(commands, args) {
     let state = {};
     for (const handlerKey in commands) {
         let argIndex = args.indexOf(handlerKey);
-        if(argIndex != -1){
-            let argState = {getNextValue: ()=>args[argIndex+1]};
+        if (argIndex != -1) {
+            let argState = { getNextValue: () => args[argIndex + 1] };
             let arg = args[argIndex];
             let handler = commands[handlerKey];
             let value;
-            if(handler.valueStrategy){
+            if (handler.valueStrategy) {
                 value = handler.valueStrategy(argState);
             }
-            if(handler.coerceValue){
+            if (handler.coerceValue) {
                 value = handler.coerceValue(value);
             }
             handler.handleValue(value, state);
@@ -92,11 +99,18 @@ bot.on('message', function (user, userID, channelID, message, evt) {
                     });
                     break;
                 }
-                let timerId = addTimer(channelID, parsed.newTimerSeconds, userID);
+                if (parsed.timerName) {
+                    const maxTimeNameLength = 64;
+                    parsed.timerName = parsed.timerName.substring(0, maxTimeNameLength);
+                }
+                let timerId = addTimer(channelID, parsed.newTimerSeconds, userID, parsed.timerName);
                 if (timerId) {
+                    let namePart = parsed.timerName ?
+                        `Name: ${parsed.timerName}` :
+                        `Id : ${timerId}`
                     bot.sendMessage({
                         to: channelID,
-                        message: `<@${userID}> Starting Timer for ${parsed.newTimerSeconds} seconds. Id : ${timerId}`
+                        message: `<@${userID}> Starting Timer for ${parsed.newTimerSeconds} seconds. ${namePart}`
                     });
                 }
 
@@ -106,14 +120,17 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 });
 
 function onTimer(arg) {
+    let namePart = arg.timerName ?
+        `Name: ${arg.timerName}` :
+        `Id : ${arg.id}`;
     bot.sendMessage({
         to: arg.channelID,
-        message: `<@${arg.userID}> Timer Elapsed. Id : ${arg.id}`
+        message: `<@${arg.userID}> Timer Elapsed. ${namePart}`
     });
     removeTimer(arg.channelID, arg.id);
 }
 
-function addTimer(channelID, seconds, userID) {
+function addTimer(channelID, seconds, userID, timerName) {
     if (hashCount > 1000) {
         return null;
     }
@@ -122,7 +139,7 @@ function addTimer(channelID, seconds, userID) {
     hashCount++; //increment before we get id, because we dont want an id of zero (falsey)
     let myId = pad(hashCount, 4);
     let timeMilliseconds = seconds * 1000;
-    setTimeout(onTimer, timeMilliseconds, { channelID: channelID, id: myId, userID: userID });
+    setTimeout(onTimer, timeMilliseconds, { channelID: channelID, id: myId, userID: userID, timerName: timerName });
     return myId;
 }
 
