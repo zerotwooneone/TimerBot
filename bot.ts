@@ -2,8 +2,9 @@ import Discord = require('discord.io');
 import logger = require('winston');
 import * as auth from './auth.json';
 import { ValueStrategy } from "./ValueStrategy";
-import {Coercion} from './Coercion';
-import {TimerManager} from './TimerManager';
+import { Coercion } from './Coercion';
+import { TimerManager } from './TimerManager';
+import { Commands, CommandParser, HandleValue } from './CommandParser'
 
 // Configure logger settings
 var timerManager = new TimerManager();
@@ -21,36 +22,16 @@ bot.on('ready', function (evt: any) {
     logger.info('Logged in as: ');
     logger.info(bot.username + ' - (' + bot.id + ')');
 });
-var commandHandler = {
+var commands: Commands = {
     "-s": { handleValue: HandleValue("newTimerSeconds"), valueStrategy: ValueStrategy.NextArg, coerceValue: Coercion.ToInt() },
     "--seconds": { handleValue: HandleValue("newTimerSeconds"), valueStrategy: ValueStrategy.NextArg, coerceValue: Coercion.ToInt() },
     "-n": { handleValue: HandleValue("timerName"), valueStrategy: ValueStrategy.NextArgWithQuotes, coerceValue: Coercion.ToString() },
     "--name": { handleValue: HandleValue("timerName"), valueStrategy: ValueStrategy.NextArgWithQuotes, coerceValue: Coercion.ToString() },
 }
+var commandParser = new CommandParser(commands);
 
-function HandleValue(stateKey: any): (value: any, state: any) => void {
-    return (value: any, state: any) => state[stateKey] = value;
-}
-function Parse(commands: any, args: string[]): {} {
-    let state = {};
-    for (const handlerKey in commands) {
-        let argIndex = args.indexOf(handlerKey);
-        if (argIndex != -1) {
-            let nextValueIndex = argIndex + 1;
-            let argState = { getNextValue: () => args[nextValueIndex++] };
-            let handler = commands[handlerKey];
-            let value;
-            if (handler.valueStrategy) {
-                value = handler.valueStrategy(argState);
-            }
-            if (handler.coerceValue) {
-                value = handler.coerceValue(value);
-            }
-            handler.handleValue(value, state);
-        }
-    }
-    return state;
-}
+
+
 bot.on('message', function (user: string, userID: string, channelID: string, message: string, evt: any) {
     // Our bot needs to know if it will execute a command
     // It will listen for messages that will start with `!`
@@ -61,7 +42,7 @@ bot.on('message', function (user: string, userID: string, channelID: string, mes
         args = args.splice(1);
         switch (cmd) {
             case 'timer':
-                let parsed: any = Parse(commandHandler, args);
+                let parsed: any = commandParser.Parse(args);
                 if (parsed.newTimerSeconds === undefined ||
                     parsed.newTimerSeconds === null ||
                     Number.isNaN(parsed.newTimerSeconds)) {
@@ -92,9 +73,12 @@ bot.on('message', function (user: string, userID: string, channelID: string, mes
                 let hashKey = getHashKey(channelID);
                 let timerParam: timerParam = {
                     onComplete: () => {
+                        let namePart = parsed.timerName ?
+                            parsed.timerName :
+                            '';
                         bot.sendMessage({
                             to: channelID,
-                            message: `<@${userID}> Timer Elapsed. ${parsed.timerName}`
+                            message: `<@${userID}> Timer Elapsed. ${namePart}`
                         });
                     },
                     hashKey: hashKey
@@ -120,7 +104,7 @@ interface timerParam {
     hashKey: string
 }
 
-function onTimer(arg: timerParam):void {
+function onTimer(arg: timerParam): void {
     if (arg.onComplete && typeof arg.onComplete === 'function') {
         arg.onComplete();
     }
