@@ -4,13 +4,13 @@ import * as auth from './auth.json';
 import { ValueStrategy } from "./ValueStrategy";
 import {Coercion} from './Coercion';
 import {TimerManager} from './TimerManager';
+
 // Configure logger settings
-/* var timerHash: { [index: string]: { id: string } } = {};
-var hashCount: number = 0; */
 var timerManager = new TimerManager();
 logger.remove(logger.transports.Console);
 logger.add(new logger.transports.Console);
 logger.level = 'debug';
+
 // Initialize Discord Bot
 var bot = new Discord.Client({
     token: auth.token,
@@ -89,15 +89,12 @@ bot.on('message', function (user: string, userID: string, channelID: string, mes
                     const maxTimeNameLength = 64;
                     parsed.timerName = parsed.timerName.substring(0, maxTimeNameLength);
                 }
-                let hashKey = getHashKey(channelID, timerManager.HashCount);
-                let timerParam = {
+                let hashKey = getHashKey(channelID);
+                let timerParam: timerParam = {
                     onComplete: () => {
-                        let namePart = parsed.timerName ?
-                            `Name: ${parsed.timerName}` :
-                            "";
                         bot.sendMessage({
                             to: channelID,
-                            message: `<@${userID}> Timer Elapsed. ${namePart}`
+                            message: `<@${userID}> Timer Elapsed. ${parsed.timerName}`
                         });
                     },
                     hashKey: hashKey
@@ -118,15 +115,20 @@ bot.on('message', function (user: string, userID: string, channelID: string, mes
     }
 });
 
-function onTimer(arg: any) {
+interface timerParam {
+    onComplete: () => void,
+    hashKey: string
+}
+
+function onTimer(arg: timerParam):void {
     if (arg.onComplete && typeof arg.onComplete === 'function') {
         arg.onComplete();
     }
     timerManager.removeTimer(arg.hashKey);
 }
 
-function getHashKey(channelID: string, id: any): string {
-    let hashKey = `channel:${channelID}-id:${id}`;
+function getHashKey(channelID: string): string {
+    let hashKey = `channel:${channelID}-id:${timerManager.HashCount}`;
     return hashKey;
 }
 
