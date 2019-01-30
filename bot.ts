@@ -1,9 +1,13 @@
 import Discord = require('discord.io');
 import logger = require('winston');
 import * as auth from './auth.json';
+import { ValueStrategy } from "./ValueStrategy";
+import {Coercion} from './Coercion';
+import {TimerManager} from './TimerManager';
 // Configure logger settings
-var timerHash: { [index: string]: { id: string } } = {};
-var hashCount: number = 0;
+/* var timerHash: { [index: string]: { id: string } } = {};
+var hashCount: number = 0; */
+var timerManager = new TimerManager();
 logger.remove(logger.transports.Console);
 logger.add(new logger.transports.Console);
 logger.level = 'debug';
@@ -18,50 +22,12 @@ bot.on('ready', function (evt: any) {
     logger.info(bot.username + ' - (' + bot.id + ')');
 });
 var commandHandler = {
-    "-s": { handleValue: HandleValue("newTimerSeconds"), valueStrategy: NextArg, coerceValue: CoerceInt() },
-    "--seconds": { handleValue: HandleValue("newTimerSeconds"), valueStrategy: NextArg, coerceValue: CoerceInt() },
-    "-n": { handleValue: HandleValue("timerName"), valueStrategy: NextArgWithQuotes, coerceValue: CoerceString() },
-    "--name": { handleValue: HandleValue("timerName"), valueStrategy: NextArgWithQuotes, coerceValue: CoerceString() },
+    "-s": { handleValue: HandleValue("newTimerSeconds"), valueStrategy: ValueStrategy.NextArg, coerceValue: Coercion.ToInt() },
+    "--seconds": { handleValue: HandleValue("newTimerSeconds"), valueStrategy: ValueStrategy.NextArg, coerceValue: Coercion.ToInt() },
+    "-n": { handleValue: HandleValue("timerName"), valueStrategy: ValueStrategy.NextArgWithQuotes, coerceValue: Coercion.ToString() },
+    "--name": { handleValue: HandleValue("timerName"), valueStrategy: ValueStrategy.NextArgWithQuotes, coerceValue: Coercion.ToString() },
 }
-function CoerceInt(): (s: string) => number | null {
-    return (stringValue: string) => {
-        let intValue = parseInt(stringValue);
-        if (Number.isNaN(intValue)) {
-            return null;
-        }
-        return intValue;
-    }
-}
-function CoerceString(): (s: string) => string {
-    return (stringValue: string) => {
-        return stringValue;
-    }
-}
-function NextArg(state: any): string {
-    return state.getNextValue();
-}
-function NextArgWithQuotes(state: any): string {
-    let value = state.getNextValue();
-    if (value && value.startsWith('"')) {
-        let result = value.substring(1);
-        const maxArgSteps = 10000;
-        for (let argStepCount = 0; argStepCount < maxArgSteps; argStepCount++) {
-            value = state.getNextValue();
-            if (value === null || value === undefined) {
-                return result;
-            }
-            let quoteIndex = value.indexOf('"');
-            if (quoteIndex >= 0) {
-                result = result + " " + value.substring(0, quoteIndex);
-            } else {
-                result = result + " " + value;
-            }
-        }
-        return value;
-    } else {
-        return value;
-    }
-}
+
 function HandleValue(stateKey: any): (value: any, state: any) => void {
     return (value: any, state: any) => state[stateKey] = value;
 }
@@ -123,12 +89,12 @@ bot.on('message', function (user: string, userID: string, channelID: string, mes
                     const maxTimeNameLength = 64;
                     parsed.timerName = parsed.timerName.substring(0, maxTimeNameLength);
                 }
-                let hashKey = getHashKey(channelID, hashCount);
+                let hashKey = getHashKey(channelID, timerManager.HashCount);
                 let timerParam = {
                     onComplete: () => {
                         let namePart = parsed.timerName ?
                             `Name: ${parsed.timerName}` :
-                            `Id : ${timerHash[hashKey].id}`;
+                            "";
                         bot.sendMessage({
                             to: channelID,
                             message: `<@${userID}> Timer Elapsed. ${namePart}`
@@ -136,7 +102,7 @@ bot.on('message', function (user: string, userID: string, channelID: string, mes
                     },
                     hashKey: hashKey
                 };
-                let timerId = addTimer(parsed.newTimerSeconds, hashKey, onTimer, timerParam)
+                let timerId = timerManager.addTimer(parsed.newTimerSeconds, hashKey, onTimer, timerParam)
                 if (timerId) {
                     let namePart = parsed.timerName ?
                         `Name: ${parsed.timerName}` :
@@ -156,24 +122,7 @@ function onTimer(arg: any) {
     if (arg.onComplete && typeof arg.onComplete === 'function') {
         arg.onComplete();
     }
-    removeTimer(arg.hashKey);
-}
-
-function addTimer(seconds: number, hashKey: string, func: (x: any) => void, param: any): string | null {
-    if (hashCount > 1000) {
-        return null;
-    }
-    hashCount++; //increment before we get id, because we dont want an id of zero (falsey)
-    let myId = pad(hashCount, 4, '0');
-    timerHash[hashKey] = { id: myId };
-    let timeMilliseconds = seconds * 1000;
-    setTimeout(func, timeMilliseconds, param);
-    return myId;
-}
-
-function removeTimer(hashKey: string): void {
-    delete timerHash[hashKey];
-    hashCount--;
+    timerManager.removeTimer(arg.hashKey);
 }
 
 function getHashKey(channelID: string, id: any): string {
@@ -181,8 +130,3 @@ function getHashKey(channelID: string, id: any): string {
     return hashKey;
 }
 
-function pad(input: any, width: any, padCharacter: any): string {
-    padCharacter = padCharacter || '0';
-    input = input + '';
-    return input.length >= width ? input : new Array(width - input.length + 1).join(padCharacter) + input;
-}
